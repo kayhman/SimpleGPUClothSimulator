@@ -1,0 +1,1 @@
+cuda_add_library(clothSimulation clothSimulation.h clothSimulation.cu)
