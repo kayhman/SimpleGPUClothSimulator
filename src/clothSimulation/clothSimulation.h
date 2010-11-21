@@ -41,11 +41,13 @@ public:
 	void integrate();
 
 	//Accessors
-	std::vector<float>	getNodeX();
-	std::vector<float>	getNodeY();
-	std::vector<float>	getNodeZ();
+	std::vector<float>&	getNodeX();
+	std::vector<float>&	getNodeY();
+	std::vector<float>&	getNodeZ();
 
 private:
 	void transfertToGpu();
+public:
+	void transfertFromGpu();
 
 };

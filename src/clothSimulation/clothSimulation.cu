@@ -20,7 +20,7 @@
 {
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
-
+/*
 	const float x = X[nodeI * sizeX + nodeJ];
 	const float y = Y[nodeI * sizeX + nodeJ];
 	const float z = Z[nodeI * sizeX + nodeJ];
@@ -53,10 +53,10 @@
 				  		fz += k * (fabs(nz - z) - refLengthDiagZ) ;
 			  		}
 			  	}
-
-	fX[nodeI * sizeX + nodeJ] = fx;
-	fY[nodeI * sizeX + nodeJ] = fy;
-	fZ[nodeI * sizeX + nodeJ] = fz;
+*/
+	fX[nodeI * sizeX + nodeJ] = 0.;//fx;
+	fY[nodeI * sizeX + nodeJ] = 1.;//fy;
+	fZ[nodeI * sizeX + nodeJ] = 2.;//fz;
 
 }
  
@@ -83,15 +83,18 @@ refLengthDiagX(0.),
 refLengthDiagY(0.),
 refLengthDiagZ(0.)
 {
-
+	cudaError_t error;
+	
 	cudaMalloc (&devNodeX, sizeX * sizeY * sizeof(float));
 	cudaMalloc (&devNodeY, sizeX * sizeY * sizeof(float));
 	cudaMalloc (&devNodeZ, sizeX * sizeY * sizeof(float));
 	
 	cudaMalloc (&devFx, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devFy, sizeX * sizeY * sizeof(float));
+	error = cudaMalloc (&devFy, sizeX * sizeY * sizeof(float));
 	cudaMalloc (&devFz, sizeX * sizeY * sizeof(float));
 	
+	
+	std::cout << cudaGetErrorString(error) << std::endl;
 	
 	cudaMemset (&devNodeX, 0, sizeX * sizeY * sizeof(float));
 	cudaMemset (&devNodeY, 0, sizeX * sizeY * sizeof(float));
@@ -126,13 +129,18 @@ float b)
 	float dx = lx / sizeX;
 	float dy = ly / sizeY;
 
-	for(float x = x0 ; x < x0 + lx ; x += dx)
-		for(float y = y0 ; y < y0 + ly ; y += dy)
+	for(int i = 0 ; i < sizeX ; ++i)
+		for(int j = 0 ; j < sizeY ; ++j)
 		{
+			float x = x0 + i *dx;
+			float y = y0 + i *dy;
+			
 			nodeX.push_back(x);
 			nodeY.push_back(y);
 			nodeZ.push_back(z0);
 		}
+		
+	std::cout << "check :" << nodeX.size() << " " << sizeX * sizeY << std::endl;
 	transfertToGpu();
 }
 
@@ -187,25 +195,39 @@ void ClothSimulation::integrate()
 
 }
 
-std::vector<float>	ClothSimulation::getNodeX()
+std::vector<float>&	ClothSimulation::getNodeX()
 {
 	return nodeX;
 }
 
-std::vector<float>	ClothSimulation::getNodeY()
+std::vector<float>&	ClothSimulation::getNodeY()
 {
 	return nodeY;
 }
 
-std::vector<float>	ClothSimulation::getNodeZ()
+std::vector<float>&	ClothSimulation::getNodeZ()
 {
 	return nodeZ;
 }
 	
-
 void ClothSimulation::transfertToGpu()
 {
 	cudaMemcpy (devNodeX, &(nodeX[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
  	cudaMemcpy (devNodeY, &(nodeY[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
  	cudaMemcpy (devNodeZ, &(nodeZ[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
+}
+
+void ClothSimulation::transfertFromGpu()
+{
+	cudaMemset (&devFx, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (&devFy, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (&devFz, 0, sizeX * sizeY * sizeof(float));
+	
+	cudaError_t error;
+
+	cudaMemcpy ( &(nodeX[0]), devFx, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+ 	error = cudaMemcpy ( &(nodeY[0]), devFy, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+ 	cudaMemcpy ( &(nodeZ[0]), devFz, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+ 	
+ 	std::cout << cudaGetErrorString(error) << std::endl;
 }
