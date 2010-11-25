@@ -133,7 +133,7 @@ float b)
 		for(int j = 0 ; j < sizeY ; ++j)
 		{
 			float x = x0 + i *dx;
-			float y = y0 + i *dy;
+			float y = y0 + j *dy;
 			
 			nodeX.push_back(x);
 			nodeY.push_back(y);
@@ -150,7 +150,7 @@ void ClothSimulation::computeInternalForces()
 	
 	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
 	
-	int gridSize = sqrt(nbGridCells);
+	int gridSize = sqrt((double)nbGridCells);
 	
 	dim3 blockSize(gridSize, gridSize, 0);
 	
