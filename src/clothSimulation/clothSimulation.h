@@ -4,25 +4,17 @@
 class ClothSimulation
 {
 private:
-	std::vector<float> nodeX;
-	std::vector<float> nodeY;
-	std::vector<float> nodeZ;
+	std::vector<float> nodePosition;
 
 	int sizeX;
 	int sizeY;
 	int nbNodes;
 
 	//device variables
-	float* devNodeX;
-	float* devNodeY;
-	float* devNodeZ;
-
-	float* devFx;
-	float* devFy;
-	float* devFz;
+	float* devNodePos;
+	float* devF;
 
 	float k;
-	float b;
 	float refLengthX;
 	float refLengthY;
 	float refLengthZ;
@@ -35,15 +27,13 @@ public:
 	~ClothSimulation();
 
 	void init(float x0, float y0, float z0, float lx, float ly,
-			float k, float b);
+			float k);
 	void computeInternalForces();
 	void computeContactForces();
 	void integrate();
 
 	//Accessors
-	std::vector<float>&	getNodeX();
-	std::vector<float>&	getNodeY();
-	std::vector<float>&	getNodeZ();
+	std::vector<float>&	getNodePosition();
 
 private:
 	void transfertToGpu();
