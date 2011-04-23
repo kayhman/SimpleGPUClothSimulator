@@ -120,7 +120,6 @@ void DrawGLScene()
 			  glVertex3f(nodeX[3], nodeY[3], nodeZ[3]);		        // right of traingle (front)	
 		  }
 
-
   // front face of pyramid
 
   glEnd();					// Done Drawing The Pyramid
@@ -207,7 +206,9 @@ return 0;
 
 	for(int i = 0 ; i < 512  ; ++i)
 	{
-		std::cout << clothSimulation.getNodeY()[i] << std::endl;
+		std::cout << clothSimulation.getNodePosition()[3*i+0] << std::endl;
+		std::cout << clothSimulation.getNodePosition()[3*i+1] << std::endl;
+		std::cout << clothSimulation.getNodePosition()[3*i+2] << std::endl << std::endl;
 	}
 
 	std::cout << "welcome into our cloth simulator. Please select an item." << std::endl;
