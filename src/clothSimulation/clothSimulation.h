@@ -9,15 +9,23 @@ private:
 	std::vector<float> nodeY;
 	std::vector<float> nodeZ;
 	
+	std::vector<Triangle> triangles;
+
 	int sizeX;
 	int sizeY;
 	int nbNodes;
 
 	//device variables
-	float* devNodePos;
-	float* devF;
+	float* devNodeX;
+	float* devNodeY;
+	float* devNodeZ;
+
+	float* devFx;
+	float* devFy;
+	float* devFz;
 
 	float k;
+	float b;
 	float refLengthX;
 	float refLengthY;
 	float refLengthZ;
@@ -30,10 +38,11 @@ public:
 	~ClothSimulation();
 
 	void init(float x0, float y0, float z0, float lx, float ly,
-			float k);
+			float k, float b);
 	void computeInternalForces();
 	void computeContactForces();
 	void integrate();
+
 
 	//Accessors
 	std::vector<float>&	getNodeX();
@@ -42,6 +51,7 @@ public:
 	int getSizeX();
 	int getSizeY();
 	
+
 private:
 	void transfertToGpu();
 public:
