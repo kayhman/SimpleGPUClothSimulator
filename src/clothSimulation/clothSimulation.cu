@@ -141,7 +141,7 @@ float b)
 		}
 		
 	std::cout << "check :" << nodeX.size() << " " << sizeX * sizeY << std::endl;
-	transfertToGpu();
+	//transfertToGpu();
 }
 
 void ClothSimulation::computeInternalForces()
@@ -208,6 +208,16 @@ std::vector<float>&	ClothSimulation::getNodeY()
 std::vector<float>&	ClothSimulation::getNodeZ()
 {
 	return nodeZ;
+}
+	
+int ClothSimulation::getSizeX()
+{
+	return sizeX;
+}
+
+int ClothSimulation::getSizeY()
+{
+	return sizeY;
 }
 	
 void ClothSimulation::transfertToGpu()

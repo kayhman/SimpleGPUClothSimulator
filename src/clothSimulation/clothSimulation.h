@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "triangle.h"
 
 class ClothSimulation
 {
@@ -7,6 +8,8 @@ private:
 	std::vector<float> nodeX;
 	std::vector<float> nodeY;
 	std::vector<float> nodeZ;
+	
+	std::vector<Triangle> triangles;
 
 	int sizeX;
 	int sizeY;
@@ -44,6 +47,9 @@ public:
 	std::vector<float>&	getNodeX();
 	std::vector<float>&	getNodeY();
 	std::vector<float>&	getNodeZ();
+	int getSizeX();
+	int getSizeY();
+	
 
 private:
 	void transfertToGpu();

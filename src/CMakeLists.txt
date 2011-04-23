@@ -1,4 +1,6 @@
 find_package(CUDA)
+find_package(OpenGL)
+find_package(GLUT)
 add_subdirectory(clothSimulation)
 add_subdirectory(clothDisplay)
 add_subdirectory(clothAppli)
