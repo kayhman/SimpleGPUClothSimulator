@@ -1,7 +1,6 @@
 #include <iostream>
 #include "clothSimulation.h"
 
-ClothSimulation clothSimulation(150, 150);
 
 
 //
@@ -64,12 +63,29 @@ void ReSizeGLScene(int Width, int Height)
 /* The main drawing function. */
 void DrawGLScene()
 {
+	static bool init = true;
+	static ClothSimulation clothSimulation(16, 16);
+
+	if(init)
+	{
+		clothSimulation.init(-0.5, -0.5, 2.,
+								1.0, 1.0,
+								0.001, 0.);
+		init = false;
+	}
+	
+	clothSimulation.computeInternalForces();
+	clothSimulation.handleCollision();
+	clothSimulation.integrate();
+	clothSimulation.transfertFromGpu();
+
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);	// Clear The Screen And The Depth Buffer
   glLoadIdentity();				// Reset The View
 
   glTranslatef(-1.5f,0.0f,-6.0f);		// Move Left 1.5 Units And Into The Screen 6.0
+  glRotatef(50.0,1.0f,0.0f,0.0f);		// Rotate The Pyramid On The Y axis 
 	
-  glRotatef(rtri,0.0f,1.0f,0.0f);		// Rotate The Pyramid On The Y axis 
+  glRotatef(rtri,1.0f,0.0f,0.0f);		// Rotate The Pyramid On The Y axis 
 
   // draw a pyramid (in smooth coloring mode)
   glBegin(GL_TRIANGLES);				// start drawing a pyramid
@@ -105,28 +121,27 @@ void DrawGLScene()
 
 
 		  	  glColor3f(1.0f,0.0f,0.0f);			// Set The Color To Red
-  			  glVertex3f(nodeX[0], nodeY[0], nodeZ[0]);		        // Top of triangle (front)
+  			  glVertex3f(nodeX[0], nodeY[0], -nodeZ[0]);		        // Top of triangle (front)
   			  glColor3f(0.0f,1.0f,0.0f);			// Set The Color To Green
-			  glVertex3f(nodeX[1], nodeY[1], nodeZ[1]);		// left of triangle (front)
+			  glVertex3f(nodeX[1], nodeY[1], -nodeZ[1]);		// left of triangle (front)
 			  glColor3f(0.0f,0.0f,1.0f);			// Set The Color To Blue
-			  glVertex3f(nodeX[2], nodeY[2], nodeZ[2]);		        // right of traingle (front)	
+			  glVertex3f(nodeX[2], nodeY[2], -nodeZ[2]);		        // right of traingle (front)	
 		  	
 		  	
 		  	  glColor3f(1.0f,0.0f,0.0f);			// Set The Color To Red
-  			  glVertex3f(nodeX[2], nodeY[2], nodeZ[2]);		        // Top of triangle (front)
+  			  glVertex3f(nodeX[2], nodeY[2], -nodeZ[2]);		        // Top of triangle (front)
   			  glColor3f(0.0f,1.0f,0.0f);			// Set The Color To Green
-			  glVertex3f(nodeX[1], nodeY[1], nodeZ[1]);		// left of triangle (front)
+			  glVertex3f(nodeX[1], nodeY[1], -nodeZ[1]);		// left of triangle (front)
 			  glColor3f(0.0f,0.0f,1.0f);			// Set The Color To Blue
-			  glVertex3f(nodeX[3], nodeY[3], nodeZ[3]);		        // right of traingle (front)	
+			  glVertex3f(nodeX[3], nodeY[3], -nodeZ[3]);		        // right of traingle (front)	
 		  }
-
 
   // front face of pyramid
 
   glEnd();					// Done Drawing The Pyramid
 
-  rtri+= 0.15f;					// Increase The Rotation Variable For The Pyramid
-  rquad-= 0.15f;					// Decrease The Rotation Variable For The Cube
+  rtri+= 0.015f*0.;					// Increase The Rotation Variable For The Pyramid
+  rquad-= 0.015f*0.;					// Decrease The Rotation Variable For The Cube
 
   // swap the buffers to display, since double buffering is used.
   glutSwapBuffers();
@@ -151,9 +166,6 @@ void keyPressed(unsigned char key, int x, int y)
 
 int main(int argc, char **argv) 
 { 
-	clothSimulation.init(0., 0., 0.,
-							1.0, 1.0,
-							1e3, 1e3);
 
  
   /* Initialize GLUT state - glut will take any command line arguments that pertain to it or 
@@ -199,19 +211,6 @@ int main(int argc, char **argv)
   
   /* Start Event Processing Engine */  
   glutMainLoop();  
-return 0;
+  return 0;
 	
-	//clothSimulation.computeInternalForces();
-
-	//clothSimulation.transfertFromGpu();
-
-	for(int i = 0 ; i < 512  ; ++i)
-	{
-		std::cout << clothSimulation.getNodeY()[i] << std::endl;
-	}
-
-	std::cout << "welcome into our cloth simulator. Please select an item." << std::endl;
-
-
-  return 1;
 }

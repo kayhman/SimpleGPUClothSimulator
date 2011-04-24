@@ -4,23 +4,23 @@
 ///////////////////////////////////////////
 //           CUDA Kernel Code            //
 ///////////////////////////////////////////
+
+const float mass = 1.0f;
+const float gravity = 9.81f;
+const float dt = 1e-3;
+
+
  __global__ void internalForcesKernel(float* X, float * Y, float* Z,
  float* fX,
  float* fY,
  float* fZ,
  const float k,
  const int sizeX,
- const float refLengthX,
- const float refLengthY,
- const float refLengthZ,
- const float refLengthDiagX,
- const float refLengthDiagY,
- const float refLengthDiagZ 
- )
+ const float h)
 {
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
-/*
+
 	const float x = X[nodeI * sizeX + nodeJ];
 	const float y = Y[nodeI * sizeX + nodeJ];
 	const float z = Z[nodeI * sizeX + nodeJ];
@@ -28,37 +28,101 @@
 	
 	float fx = 0.0;
 	float fy = 0.0;
-	float fz = 0.0;
-  	for(int i = -1 ; i < 1 ; ++i)
-	  	for(int j = -1 ; j < 1 ; ++j)
-		  	if(i != 0 && j != 0)
-			  	{
-			  		const int neighboursI = nodeI - 1 + i * 2 ;
-			  		const int neighboursJ = nodeJ - 1 + j * 2 ;
-			  		
-			  		const float nx = X[neighboursI * sizeX + neighboursJ];
-			  		const float ny = Y[neighboursI * sizeX + neighboursJ];
-			  		const float nz = Z[neighboursI * sizeX + neighboursJ];
-			  		
-			  		if(i == 0 || j == 0)
-			  		{
-				  		fx += k * (fabs(nx - x) - refLengthX) ;
-				  		fy += k * (fabs(ny - y) - refLengthY) ;
-				  		fz += k * (fabs(nz - z) - refLengthZ) ;
-			  		}
-			  		else
-			  		{
-			  			fx += k * (fabs(nx - x) - refLengthDiagX) ;
-				  		fy += k * (fabs(ny - y) - refLengthDiagY) ;
-				  		fz += k * (fabs(nz - z) - refLengthDiagZ) ;
-			  		}
-			  	}
-*/
-	fX[nodeI * sizeX + nodeJ] = 0.;//fx;
-	fY[nodeI * sizeX + nodeJ] = 1.;//fy;
-	fZ[nodeI * sizeX + nodeJ] = 2.;//fz;
+	float fz = - mass * gravity;
 
+  	for(int i = -1 ; i < 2 ; ++i)
+	  	for(int j = -1 ; j < 2 ; ++j)
+		  	if(! (i == 0 && j == 0) )
+			  	{
+			  		const int neighboursI = nodeI + i;
+			  		const int neighboursJ = nodeJ + j;
+			  		
+			  		if(neighboursI > 0 && neighboursJ > 0 &&
+			  		   neighboursI < sizeX && neighboursJ < sizeX)
+			  		{
+				  		const float nx = X[neighboursI * sizeX + neighboursJ] - x;
+				  		const float ny = Y[neighboursI * sizeX + neighboursJ] - y;
+				  		const float nz = Z[neighboursI * sizeX + neighboursJ] - z;
+				  		const float norm = sqrt(nx * nx + ny * ny + nz * nz);
+				  		
+				  		if(norm != 0.0)
+				  		{
+					  		if(i == 0 || j == 0)
+					  		{
+					  			const float diff = norm - h;
+						  		fx += k * diff * nx / norm;
+						  		fy += k * diff * ny / norm;
+						  		fz += k * diff * nz / norm;
+					  		}
+					  		else
+					  		{
+					  			const float diff = norm - sqrt(2.0) * h;
+						  		fx += k * diff * nx / norm;
+						  		fy += k * diff * ny / norm;
+						  		fz += k * diff * nz / norm;
+					  		
+					  		}
+					  	}
+				  	}
+			  	}
+
+	fX[nodeI * sizeX + nodeJ] = fx;
+	fY[nodeI * sizeX + nodeJ] = fy;
+	fZ[nodeI * sizeX + nodeJ] = fz;
 }
+
+__global__ void integrateNodePosition(float* X, float * Y, float* Z,
+float* Ux, float * Uy, float* Uz,
+ float* fX,
+ float* fY,
+ float* fZ,
+ const int sizeX)
+{
+	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
+	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+
+	Ux[nodeI * sizeX + nodeJ] += dt * fX[nodeI * sizeX + nodeJ] / mass;
+	Uy[nodeI * sizeX + nodeJ] += dt * fY[nodeI * sizeX + nodeJ] / mass;
+	Uz[nodeI * sizeX + nodeJ] += dt * fZ[nodeI * sizeX + nodeJ] / mass;
+
+
+	X[nodeI * sizeX + nodeJ] += dt * Ux[nodeI * sizeX + nodeJ];
+	Y[nodeI * sizeX + nodeJ] += dt * Uy[nodeI * sizeX + nodeJ];
+	Z[nodeI * sizeX + nodeJ] += dt * Uz[nodeI * sizeX + nodeJ];
+	
+	
+}
+
+__global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
+ float* fX,
+ float* fY,
+ float* fZ,
+ const int sizeX)
+{
+	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
+	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+
+	const float diskZ = 0.0f;
+	const float diskRadius = 0.15f;
+	
+	const float diskCenterX = 0.f;
+	const float diskCenterY = 0.f;
+	
+	const float x = X[nodeI * sizeX + nodeJ];
+	const float y = Y[nodeI * sizeX + nodeJ];
+	const float z = Z[nodeI * sizeX + nodeJ];
+
+	if(z > diskZ)
+	{
+		const float distToCenter = sqrt( (x - diskCenterX) * (x - diskCenterX) + (y - diskCenterY) * (y- diskCenterY) );
+		
+		if(distToCenter < diskRadius)
+		{
+			fZ[nodeI * sizeX + nodeJ] += 0.1;
+		}
+	 }
+}
+
  
  
 ///////////////////////////////////////////
@@ -71,6 +135,9 @@ nbNodes(sizeX*sizeY),
 devNodeX(NULL),
 devNodeY(NULL),
 devNodeZ(NULL),
+devNodeUx(NULL),
+devNodeUy(NULL),
+devNodeUz(NULL),
 devFx(NULL),
 devFy(NULL),
 devFz(NULL),
@@ -89,20 +156,29 @@ refLengthDiagZ(0.)
 	cudaMalloc (&devNodeY, sizeX * sizeY * sizeof(float));
 	cudaMalloc (&devNodeZ, sizeX * sizeY * sizeof(float));
 	
+	cudaMalloc (&devNodeUx, sizeX * sizeY * sizeof(float));
+	cudaMalloc (&devNodeUy, sizeX * sizeY * sizeof(float));
+	cudaMalloc (&devNodeUz, sizeX * sizeY * sizeof(float));
+	
+	
 	cudaMalloc (&devFx, sizeX * sizeY * sizeof(float));
-	error = cudaMalloc (&devFy, sizeX * sizeY * sizeof(float));
+	cudaMalloc (&devFy, sizeX * sizeY * sizeof(float));
 	cudaMalloc (&devFz, sizeX * sizeY * sizeof(float));
 	
 	
 	std::cout << cudaGetErrorString(error) << std::endl;
 	
-	cudaMemset (&devNodeX, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devNodeY, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devNodeZ, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeX, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeY, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeZ, 0, sizeX * sizeY * sizeof(float));
 	
-	cudaMemset (&devFx, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devFy, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devFz, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeUx, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeUy, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devNodeUz, 0, sizeX * sizeY * sizeof(float));
+		
+	cudaMemset (devFx, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devFy, 0, sizeX * sizeY * sizeof(float));
+	cudaMemset (devFz, 0, sizeX * sizeY * sizeof(float));
 	
 }
 
@@ -111,6 +187,10 @@ ClothSimulation::~ClothSimulation()
 	cudaFree(devNodeX);
 	cudaFree(devNodeY);
 	cudaFree(devNodeZ);
+
+	cudaFree(devNodeUx);
+	cudaFree(devNodeUy);
+	cudaFree(devNodeUz);
 	
 	cudaFree(devFx);
 	cudaFree(devFy);
@@ -128,6 +208,14 @@ float b)
 	
 	float dx = lx / sizeX;
 	float dy = ly / sizeY;
+	
+	refLengthX = dx;
+	refLengthY = dy;
+	refLengthZ = 0.;
+
+	refLengthDiagX = sqrt(dx * dx + dy * dy);
+	refLengthDiagY = sqrt(dx * dx + dy * dy);
+	refLengthDiagZ = sqrt(dx * dx + dy * dy);
 
 	for(int i = 0 ; i < sizeX ; ++i)
 		for(int j = 0 ; j < sizeY ; ++j)
@@ -142,7 +230,7 @@ float b)
 
 		
 	std::cout << "check :" << nodeX.size() << " " << sizeX * sizeY << std::endl;
-	//transfertToGpu();
+	transfertToGpu();
 }
 
 void ClothSimulation::computeInternalForces()
@@ -153,7 +241,7 @@ void ClothSimulation::computeInternalForces()
 	
 	int gridSize = sqrt((double)nbGridCells);
 	
-	dim3 blockSize(gridSize, gridSize, 0);
+	dim3 blockSize(gridSize, gridSize);
 	
 	std::cout << "use gridSize : " << gridSize << std::endl;
 	
@@ -163,19 +251,14 @@ void ClothSimulation::computeInternalForces()
 	cudaEventCreate(&stop);
 	
 	cudaEventRecord( start, 0 );
-	internalForcesKernel <<< nBlocks, blockSize >>> (devNodeX, devNodeY, devNodeZ,
+	internalForcesKernel <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
 	 devFx,
 	 devFy,
 	 devFz,
 	 k,
 	 sizeX,
-	 refLengthX,
-	 refLengthY,
-	 refLengthZ,
-	 refLengthDiagX,
-	 refLengthDiagY,
-	 refLengthDiagZ);
-	
+	 refLengthX);
+	 	
 	cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
 	
@@ -183,7 +266,41 @@ void ClothSimulation::computeInternalForces()
 	cudaEventDestroy( start );
 	cudaEventDestroy( stop );
 	
-	std::cout << "computeInternalForces time : " << time << " ms" << std::endl; 
+	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLengthX << std::endl; 
+}
+
+void ClothSimulation::handleCollision()
+{
+	dim3 nBlocks(4, 4);
+	
+	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
+	
+	int gridSize = sqrt((double)nbGridCells);
+	
+	dim3 blockSize(gridSize, gridSize);
+	
+	std::cout << "use gridSize : " << gridSize << std::endl;
+	
+	cudaEvent_t start, stop;
+	float time;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	
+	cudaEventRecord( start, 0 );
+	handleCollisionWithDisk <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
+	 devFx,
+	 devFy,
+	 devFz,
+	 sizeX);
+	 	
+	cudaEventRecord( stop, 0 );
+	cudaEventSynchronize( stop );
+	
+	cudaEventElapsedTime( &time, start, stop );
+	cudaEventDestroy( start );
+	cudaEventDestroy( stop );
+	
+	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLengthX << std::endl; 
 }
 
 void ClothSimulation::computeContactForces()
@@ -193,7 +310,38 @@ void ClothSimulation::computeContactForces()
 
 void ClothSimulation::integrate()
 {
-
+	dim3 nBlocks(4, 4);
+	
+	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
+	
+	int gridSize = sqrt((double)nbGridCells);
+	
+	dim3 blockSize(gridSize, gridSize);
+	
+	std::cout << "use gridSize : " << gridSize << std::endl;
+	
+	cudaEvent_t start, stop;
+	float time;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	
+	cudaEventRecord( start, 0 );
+	integrateNodePosition <<<  blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
+	devNodeUx, devNodeUy, devNodeUz,
+	 devFx,
+	 devFy,
+	 devFz,
+	 sizeX);
+	
+	cudaEventRecord( stop, 0 );
+	cudaEventSynchronize( stop );
+	
+	cudaEventElapsedTime( &time, start, stop );
+	cudaEventDestroy( start );
+	cudaEventDestroy( stop );
+	
+	std::cout << " integrate error " << cudaGetErrorString(cudaGetLastError()) << std::endl;
+	std::cout << "Integrate time : " << time << " ms" << std::endl; 
 }
 
 std::vector<float>&	ClothSimulation::getNodeX()
@@ -230,15 +378,18 @@ void ClothSimulation::transfertToGpu()
 
 void ClothSimulation::transfertFromGpu()
 {
-	cudaMemset (&devFx, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devFy, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (&devFz, 0, sizeX * sizeY * sizeof(float));
-	
 	cudaError_t error;
+	
+	//error = cudaMemset (devNodeX, 0, sizeX * sizeY * sizeof(float));
+	//cudaMemset (devNodeY, 0, sizeX * sizeY * sizeof(float));
+	//cudaMemset (devNodeZ, 0, sizeX * sizeY * sizeof(float));
+	
+	//std::cout << " 1 " << cudaGetErrorString(error) << std::endl;
 
-	cudaMemcpy ( &(nodeX[0]), devFx, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
- 	error = cudaMemcpy ( &(nodeY[0]), devFy, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
- 	cudaMemcpy ( &(nodeZ[0]), devFz, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+	error = cudaMemcpy ( &(nodeX[0]), devNodeX, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+ 	error = cudaMemcpy ( &(nodeY[0]), devNodeY, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+ 	error = cudaMemcpy ( &(nodeZ[0]), devNodeZ, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
  	
- 	std::cout << cudaGetErrorString(error) << std::endl;
+ 	std::cout << cudaGetErrorString(cudaGetLastError()) << std::endl;
+ 	
 }
