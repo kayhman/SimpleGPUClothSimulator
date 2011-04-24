@@ -5,7 +5,7 @@
 //           CUDA Kernel Code            //
 ///////////////////////////////////////////
 
-const float mass = 1.0f;
+const float mass = 0.001f;
 const float gravity = 9.81f;
 const float dt = 1e-3;
 
@@ -81,9 +81,9 @@ float* Ux, float * Uy, float* Uz,
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
 
-	Ux[nodeI * sizeX + nodeJ] += dt * fX[nodeI * sizeX + nodeJ] / mass;
-	Uy[nodeI * sizeX + nodeJ] += dt * fY[nodeI * sizeX + nodeJ] / mass;
-	Uz[nodeI * sizeX + nodeJ] += dt * fZ[nodeI * sizeX + nodeJ] / mass;
+	Ux[nodeI * sizeX + nodeJ] += dt * (fX[nodeI * sizeX + nodeJ] - Ux[nodeI * sizeX + nodeJ] * 0.05)  / mass;
+	Uy[nodeI * sizeX + nodeJ] += dt * (fY[nodeI * sizeX + nodeJ] - Uy[nodeI * sizeX + nodeJ] * 0.05)  / mass;
+	Uz[nodeI * sizeX + nodeJ] += dt * (fZ[nodeI * sizeX + nodeJ] - Uz[nodeI * sizeX + nodeJ] * 0.05)  / mass;
 
 
 	X[nodeI * sizeX + nodeJ] += dt * Ux[nodeI * sizeX + nodeJ];
@@ -103,7 +103,7 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
 
 	const float diskZ = 0.0f;
-	const float diskRadius = 0.15f;
+	const float diskRadius = 1.75f;
 	
 	const float diskCenterX = 0.f;
 	const float diskCenterY = 0.f;
@@ -112,13 +112,13 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
 	const float y = Y[nodeI * sizeX + nodeJ];
 	const float z = Z[nodeI * sizeX + nodeJ];
 
-	if(z > diskZ)
+	if(z < diskZ && z > diskZ - 0.01)
 	{
 		const float distToCenter = sqrt( (x - diskCenterX) * (x - diskCenterX) + (y - diskCenterY) * (y- diskCenterY) );
 		
 		if(distToCenter < diskRadius)
 		{
-			fZ[nodeI * sizeX + nodeJ] += 0.1;
+			fZ[nodeI * sizeX + nodeJ] += (diskZ - z) * mass / (dt*dt);
 		}
 	 }
 }
