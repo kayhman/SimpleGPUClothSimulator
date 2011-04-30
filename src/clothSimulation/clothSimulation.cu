@@ -13,7 +13,8 @@ const float dt = 1e-3;
  float* fX,
  float* fY,
  float* fZ,
- const float k,
+ const float kStrech,
+ const float kBend,
  const int sizeX,
  const float h,
  const float mass)
@@ -47,19 +48,19 @@ const float dt = 1e-3;
 				  		
 				  		if(norm != 0.0)
 				  		{
-					  		if(i == 0 || j == 0)
+					  		if(i == 0 || j == 0) //stretching spring
 					  		{
 					  			const float diff = norm - h;
-						  		fx += k * diff * nx / norm;
-						  		fy += k * diff * ny / norm;
-						  		fz += k * diff * nz / norm;
+						  		fx += kStrech * diff * nx / norm;
+						  		fy += kStrech * diff * ny / norm;
+						  		fz += kStrech * diff * nz / norm;
 					  		}
-					  		else
+					  		else  //bending spring
 					  		{
 					  			const float diff = norm - sqrt(2.0) * h;
-						  		fx += k * diff * nx / norm;
-						  		fy += k * diff * ny / norm;
-						  		fz += k * diff * nz / norm;
+						  		fx += kBend * diff * nx / norm;
+						  		fy += kBend * diff * ny / norm;
+						  		fz += kBend * diff * nz / norm;
 					  		
 					  		}
 					  	}
@@ -120,7 +121,39 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
 		
 		if(distToCenter < diskRadius)
 		{
-			fZ[nodeI * sizeX + nodeJ] += (diskZ - z) * mass / (dt*dt);
+			fZ[nodeI * sizeX + nodeJ] = 0.;
+			Z[nodeI * sizeX + nodeJ] = diskZ;
+		}
+	 }
+}
+
+__global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
+ float* fX,
+ float* fY,
+ float* fZ,
+ const int sizeX,
+ const float mass)
+{
+	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
+	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+
+	const float rectZ = 0.0f;
+	const float minX = -1.7f;
+	const float minY = -1.7f;
+	const float maxX = 1.7f;
+	const float maxY = 1.7f;
+		
+	const float x = X[nodeI * sizeX + nodeJ];
+	const float y = Y[nodeI * sizeX + nodeJ];
+	const float z = Z[nodeI * sizeX + nodeJ];
+
+	if(z < rectZ && z > rectZ - 0.01)
+	{
+		if( x > minX && x < maxX &&
+		    y > minY && y < maxY)
+		{
+			fZ[nodeI * sizeX + nodeJ] = 0.;
+			Z[nodeI * sizeX + nodeJ] = rectZ;
 		}
 	 }
 }
@@ -259,6 +292,7 @@ void ClothSimulation::computeInternalForces()
 	 devFy,
 	 devFz,
 	 k,
+	 10 * k,
 	 sizeX,
 	 refLengthX,
 	 mass);
@@ -273,7 +307,7 @@ void ClothSimulation::computeInternalForces()
 	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLengthX << std::endl; 
 }
 
-void ClothSimulation::handleCollision()
+void ClothSimulation::handleCollision(int collisionType)
 {
 	dim3 nBlocks(4, 4);
 	
@@ -291,14 +325,24 @@ void ClothSimulation::handleCollision()
 	cudaEventCreate(&stop);
 	
 	cudaEventRecord( start, 0 );
-	handleCollisionWithDisk <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
-	 devFx,
-	 devFy,
-	 devFz,
-	 sizeX,
-	 mass);
-	 	
-	cudaEventRecord( stop, 0 );
+	if(collisionType == 0)
+	{
+		handleCollisionWithDisk <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
+		 devFx,
+		 devFy,
+		 devFz,
+		 sizeX,
+		 mass);
+	}	 	
+	if(collisionType == 1)
+	{
+		handleCollisionWithRectangle <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
+		 devFx,
+		 devFy,
+		 devFz,
+		 sizeX,
+		 mass);
+	}		cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
 	
 	cudaEventElapsedTime( &time, start, stop );

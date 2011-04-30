@@ -45,7 +45,7 @@ public:
 	void init(float x0, float y0, float z0, float lx, float ly,
 			float k, float b);
 	void computeInternalForces();
-	void handleCollision();
+	void handleCollision(int collisionType);
 	void computeContactForces();
 	void integrate();
 
