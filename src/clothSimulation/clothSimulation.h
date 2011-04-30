@@ -36,6 +36,7 @@ private:
 	float refLengthDiagX;
 	float refLengthDiagY;
 	float refLengthDiagZ;
+	float mass;
 
 public:
 	ClothSimulation(int sizeX, int sizeY);

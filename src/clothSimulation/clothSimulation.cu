@@ -5,7 +5,6 @@
 //           CUDA Kernel Code            //
 ///////////////////////////////////////////
 
-const float mass = 0.001f;
 const float gravity = 9.81f;
 const float dt = 1e-3;
 
@@ -16,7 +15,8 @@ const float dt = 1e-3;
  float* fZ,
  const float k,
  const int sizeX,
- const float h)
+ const float h,
+ const float mass)
 {
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
@@ -76,14 +76,15 @@ float* Ux, float * Uy, float* Uz,
  float* fX,
  float* fY,
  float* fZ,
- const int sizeX)
+ const int sizeX,
+ const float mass)
 {
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
 
-	Ux[nodeI * sizeX + nodeJ] += dt * (fX[nodeI * sizeX + nodeJ] - Ux[nodeI * sizeX + nodeJ] * 0.05)  / mass;
-	Uy[nodeI * sizeX + nodeJ] += dt * (fY[nodeI * sizeX + nodeJ] - Uy[nodeI * sizeX + nodeJ] * 0.05)  / mass;
-	Uz[nodeI * sizeX + nodeJ] += dt * (fZ[nodeI * sizeX + nodeJ] - Uz[nodeI * sizeX + nodeJ] * 0.05)  / mass;
+	Ux[nodeI * sizeX + nodeJ] += dt * (fX[nodeI * sizeX + nodeJ] - Ux[nodeI * sizeX + nodeJ] * 0.02)  / mass;
+	Uy[nodeI * sizeX + nodeJ] += dt * (fY[nodeI * sizeX + nodeJ] - Uy[nodeI * sizeX + nodeJ] * 0.02)  / mass;
+	Uz[nodeI * sizeX + nodeJ] += dt * (fZ[nodeI * sizeX + nodeJ] - Uz[nodeI * sizeX + nodeJ] * 0.02)  / mass;
 
 
 	X[nodeI * sizeX + nodeJ] += dt * Ux[nodeI * sizeX + nodeJ];
@@ -97,7 +98,8 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
  float* fX,
  float* fY,
  float* fZ,
- const int sizeX)
+ const int sizeX,
+ const float mass)
 {
 	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
 	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
@@ -148,7 +150,8 @@ refLengthY(0.),
 refLengthZ(0.),
 refLengthDiagX(0.),
 refLengthDiagY(0.),
-refLengthDiagZ(0.)
+refLengthDiagZ(0.),
+mass(0.)
 {
 	cudaError_t error;
 	
@@ -179,7 +182,6 @@ refLengthDiagZ(0.)
 	cudaMemset (devFx, 0, sizeX * sizeY * sizeof(float));
 	cudaMemset (devFy, 0, sizeX * sizeY * sizeof(float));
 	cudaMemset (devFz, 0, sizeX * sizeY * sizeof(float));
-	
 }
 
 ClothSimulation::~ClothSimulation()
@@ -228,6 +230,7 @@ float b)
 			nodeZ.push_back(z0);
 		}
 
+	mass = 3.0 * (lx*ly) / (sizeX*sizeY);
 		
 	std::cout << "check :" << nodeX.size() << " " << sizeX * sizeY << std::endl;
 	transfertToGpu();
@@ -257,7 +260,8 @@ void ClothSimulation::computeInternalForces()
 	 devFz,
 	 k,
 	 sizeX,
-	 refLengthX);
+	 refLengthX,
+	 mass);
 	 	
 	cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
@@ -291,7 +295,8 @@ void ClothSimulation::handleCollision()
 	 devFx,
 	 devFy,
 	 devFz,
-	 sizeX);
+	 sizeX,
+	 mass);
 	 	
 	cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
@@ -300,7 +305,7 @@ void ClothSimulation::handleCollision()
 	cudaEventDestroy( start );
 	cudaEventDestroy( stop );
 	
-	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLengthX << std::endl; 
+	std::cout << "collision handling time : " << time << " ms : ref -> " << refLengthX << std::endl; 
 }
 
 void ClothSimulation::computeContactForces()
@@ -331,7 +336,8 @@ void ClothSimulation::integrate()
 	 devFx,
 	 devFy,
 	 devFz,
-	 sizeX);
+	 sizeX,
+	 mass);
 	
 	cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
