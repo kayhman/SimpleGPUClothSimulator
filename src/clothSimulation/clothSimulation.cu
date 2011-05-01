@@ -16,15 +16,16 @@ const float dt = 1e-3;
  const float kStrech,
  const float kBend,
  const int sizeX,
+ const int sizeY,
  const float h,
  const float mass)
 {
-	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
-	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
-	const float x = X[nodeI * sizeX + nodeJ];
-	const float y = Y[nodeI * sizeX + nodeJ];
-	const float z = Z[nodeI * sizeX + nodeJ];
+	const float x = X[nodeJ * sizeY + nodeI];
+	const float y = Y[nodeJ * sizeY + nodeI];
+	const float z = Z[nodeJ * sizeY + nodeI];
 
 	
 	float fx = 0.0;
@@ -39,11 +40,11 @@ const float dt = 1e-3;
 			  		const int neighboursJ = nodeJ + j;
 			  		
 			  		if(neighboursI > 0 && neighboursJ > 0 &&
-			  		   neighboursI < sizeX && neighboursJ < sizeX)
+			  		   neighboursI < sizeY && neighboursJ < sizeX)
 			  		{
-				  		const float nx = X[neighboursI * sizeX + neighboursJ] - x;
-				  		const float ny = Y[neighboursI * sizeX + neighboursJ] - y;
-				  		const float nz = Z[neighboursI * sizeX + neighboursJ] - z;
+				  		const float nx = X[neighboursJ * sizeY + neighboursI] - x;
+				  		const float ny = Y[neighboursJ * sizeY + neighboursI] - y;
+				  		const float nz = Z[neighboursJ * sizeY + neighboursI] - z;
 				  		const float norm = sqrt(nx * nx + ny * ny + nz * nz);
 				  		
 				  		if(norm != 0.0)
@@ -67,9 +68,9 @@ const float dt = 1e-3;
 				  	}
 			  	}
 
-	fX[nodeI * sizeX + nodeJ] = fx;
-	fY[nodeI * sizeX + nodeJ] = fy;
-	fZ[nodeI * sizeX + nodeJ] = fz;
+	fX[nodeJ * sizeY + nodeI] = fx;
+	fY[nodeJ * sizeY + nodeI] = fy;
+	fZ[nodeJ * sizeY + nodeI] = fz;
 }
 
 __global__ void integrateNodePosition(float* X, float * Y, float* Z,
@@ -80,8 +81,8 @@ float* Ux, float * Uy, float* Uz,
  const int sizeX,
  const float mass)
 {
-	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
-	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
 	Ux[nodeI * sizeX + nodeJ] += dt * (fX[nodeI * sizeX + nodeJ] - Ux[nodeI * sizeX + nodeJ] * 0.02)  / mass;
 	Uy[nodeI * sizeX + nodeJ] += dt * (fY[nodeI * sizeX + nodeJ] - Uy[nodeI * sizeX + nodeJ] * 0.02)  / mass;
@@ -102,8 +103,8 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
  const int sizeX,
  const float mass)
 {
-	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
-	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
 	const float diskZ = 0.0f;
 	const float diskRadius = 1.75f;
@@ -121,6 +122,8 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
 		
 		if(distToCenter < diskRadius)
 		{
+			fX[nodeI * sizeX + nodeJ] = 0.;
+			fY[nodeI * sizeX + nodeJ] = 0.;
 			fZ[nodeI * sizeX + nodeJ] = 0.;
 			Z[nodeI * sizeX + nodeJ] = diskZ;
 		}
@@ -134,14 +137,14 @@ __global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
  const int sizeX,
  const float mass)
 {
-	const int nodeI = blockIdx.x * blockDim.x + threadIdx.x;
-	const int nodeJ = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
+	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
 	const float rectZ = 0.0f;
 	const float minX = -1.7f;
-	const float minY = -1.7f;
+	const float minY = -0.7f;
 	const float maxX = 1.7f;
-	const float maxY = 1.7f;
+	const float maxY = 0.7f;
 		
 	const float x = X[nodeI * sizeX + nodeJ];
 	const float y = Y[nodeI * sizeX + nodeJ];
@@ -152,6 +155,8 @@ __global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
 		if( x > minX && x < maxX &&
 		    y > minY && y < maxY)
 		{
+			fX[nodeI * sizeX + nodeJ] = 0.;
+			fY[nodeI * sizeX + nodeJ] = 0.;
 			fZ[nodeI * sizeX + nodeJ] = 0.;
 			Z[nodeI * sizeX + nodeJ] = rectZ;
 		}
@@ -163,10 +168,10 @@ __global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
 ///////////////////////////////////////////
 //             C++ Class Code            //
 ///////////////////////////////////////////
-ClothSimulation::ClothSimulation(int sizeX, int sizeY) :
-sizeX(sizeX),
-sizeY(sizeY),
-nbNodes(sizeX*sizeY),
+ClothSimulation::ClothSimulation() :
+sizeX(0),
+sizeY(0),
+nbNodes(0),
 devNodeX(NULL),
 devNodeY(NULL),
 devNodeZ(NULL),
@@ -178,43 +183,9 @@ devFy(NULL),
 devFz(NULL),
 k(0.),
 b(0.),
-refLengthX(0.),
-refLengthY(0.),
-refLengthZ(0.),
-refLengthDiagX(0.),
-refLengthDiagY(0.),
-refLengthDiagZ(0.),
+refLength(0.),
 mass(0.)
 {
-	cudaError_t error;
-	
-	cudaMalloc (&devNodeX, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devNodeY, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devNodeZ, sizeX * sizeY * sizeof(float));
-	
-	cudaMalloc (&devNodeUx, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devNodeUy, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devNodeUz, sizeX * sizeY * sizeof(float));
-	
-	
-	cudaMalloc (&devFx, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devFy, sizeX * sizeY * sizeof(float));
-	cudaMalloc (&devFz, sizeX * sizeY * sizeof(float));
-	
-	
-	std::cout << cudaGetErrorString(error) << std::endl;
-	
-	cudaMemset (devNodeX, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devNodeY, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devNodeZ, 0, sizeX * sizeY * sizeof(float));
-	
-	cudaMemset (devNodeUx, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devNodeUy, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devNodeUz, 0, sizeX * sizeY * sizeof(float));
-		
-	cudaMemset (devFx, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devFy, 0, sizeX * sizeY * sizeof(float));
-	cudaMemset (devFz, 0, sizeX * sizeY * sizeof(float));
 }
 
 ClothSimulation::~ClothSimulation()
@@ -232,28 +203,62 @@ ClothSimulation::~ClothSimulation()
 	cudaFree(devFz);
 }
 
+void ClothSimulation::allocateGPUMem()
+{
+	cudaError_t error;
+	
+	cudaMalloc (&devNodeX, nbNodes * sizeof(float));
+	cudaMalloc (&devNodeY, nbNodes * sizeof(float));
+	cudaMalloc (&devNodeZ, nbNodes * sizeof(float));
+	
+	cudaMalloc (&devNodeUx, nbNodes * sizeof(float));
+	cudaMalloc (&devNodeUy, nbNodes * sizeof(float));
+	cudaMalloc (&devNodeUz, nbNodes * sizeof(float));
+	
+	
+	cudaMalloc (&devFx, nbNodes * sizeof(float));
+	cudaMalloc (&devFy, nbNodes * sizeof(float));
+	cudaMalloc (&devFz, nbNodes * sizeof(float));
+	
+	
+	std::cout << cudaGetErrorString(error) << std::endl;
+	
+	cudaMemset (devNodeX, 0, nbNodes * sizeof(float));
+	cudaMemset (devNodeY, 0, nbNodes * sizeof(float));
+	cudaMemset (devNodeZ, 0, nbNodes * sizeof(float));
+	
+	cudaMemset (devNodeUx, 0, nbNodes * sizeof(float));
+	cudaMemset (devNodeUy, 0, nbNodes * sizeof(float));
+	cudaMemset (devNodeUz, 0, nbNodes * sizeof(float));
+		
+	cudaMemset (devFx, 0, nbNodes * sizeof(float));
+	cudaMemset (devFy, 0, nbNodes * sizeof(float));
+	cudaMemset (devFz, 0, nbNodes * sizeof(float));
+}
+
 void ClothSimulation::init(float x0, float y0, float z0, 
 float lx, float ly,
+float elementSize,
 float k,
 float b)
 {
 	this->k = k;
 	this->b = b;
 	
+	sizeX = 4 * (lx / elementSize) / 4;
+	sizeY = 4 * (ly / elementSize) / 4;
 	
-	float dx = lx / sizeX;
-	float dy = ly / sizeY;
+	nbNodes = sizeX * sizeY;
 	
-	refLengthX = dx;
-	refLengthY = dy;
-	refLengthZ = 0.;
-
-	refLengthDiagX = sqrt(dx * dx + dy * dy);
-	refLengthDiagY = sqrt(dx * dx + dy * dy);
-	refLengthDiagZ = sqrt(dx * dx + dy * dy);
+	allocateGPUMem();
+	
+	float dx = elementSize;
+	float dy = elementSize;
+	
+	refLength = dx;
 
 	for(int i = 0 ; i < sizeX ; ++i)
-		for(int j = 0 ; j < sizeY ; ++j)
+		for(int j = 0 ; j < sizeY ; ++j)		
 		{
 			float x = x0 + i *dx;
 			float y = y0 + j *dy;
@@ -265,27 +270,21 @@ float b)
 
 	mass = 3.0 * (lx*ly) / (sizeX*sizeY);
 		
-	std::cout << "check :" << nodeX.size() << " " << sizeX * sizeY << std::endl;
+	std::cout << "grid dim : " << sizeX  << " " <<  sizeY << std::endl;
 	transfertToGpu();
+
 }
 
 void ClothSimulation::computeInternalForces()
 {
 	dim3 nBlocks(4, 4);
-	
-	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
-	
-	int gridSize = sqrt((double)nbGridCells);
-	
-	dim3 blockSize(gridSize, gridSize);
-	
-	std::cout << "use gridSize : " << gridSize << std::endl;
-	
+	dim3 blockSize(sizeX/4, sizeY/4);
+
 	cudaEvent_t start, stop;
 	float time;
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
-	
+
 	cudaEventRecord( start, 0 );
 	internalForcesKernel <<< blockSize, nBlocks >>> (devNodeX, devNodeY, devNodeZ,
 	 devFx,
@@ -294,7 +293,8 @@ void ClothSimulation::computeInternalForces()
 	 k,
 	 10 * k,
 	 sizeX,
-	 refLengthX,
+	 sizeY,
+	 refLength,
 	 mass);
 	 	
 	cudaEventRecord( stop, 0 );
@@ -304,20 +304,14 @@ void ClothSimulation::computeInternalForces()
 	cudaEventDestroy( start );
 	cudaEventDestroy( stop );
 	
-	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLengthX << std::endl; 
+	std::cout << "computeInternalForces time : " << time << " ms : ref -> " << refLength << std::endl; 
 }
 
 void ClothSimulation::handleCollision(int collisionType)
 {
 	dim3 nBlocks(4, 4);
 	
-	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
-	
-	int gridSize = sqrt((double)nbGridCells);
-	
-	dim3 blockSize(gridSize, gridSize);
-	
-	std::cout << "use gridSize : " << gridSize << std::endl;
+	dim3 blockSize(sizeX/4, sizeY/4);
 	
 	cudaEvent_t start, stop;
 	float time;
@@ -349,25 +343,14 @@ void ClothSimulation::handleCollision(int collisionType)
 	cudaEventDestroy( start );
 	cudaEventDestroy( stop );
 	
-	std::cout << "collision handling time : " << time << " ms : ref -> " << refLengthX << std::endl; 
-}
-
-void ClothSimulation::computeContactForces()
-{
-
+	std::cout << "collision handling time : " << time << " ms : ref -> " << refLength << std::endl; 
 }
 
 void ClothSimulation::integrate()
 {
 	dim3 nBlocks(4, 4);
 	
-	int nbGridCells = nbNodes / (nBlocks.x * nBlocks.y);
-	
-	int gridSize = sqrt((double)nbGridCells);
-	
-	dim3 blockSize(gridSize, gridSize);
-	
-	std::cout << "use gridSize : " << gridSize << std::endl;
+	dim3 blockSize(sizeX/4, sizeY/4);
 	
 	cudaEvent_t start, stop;
 	float time;
@@ -421,24 +404,24 @@ int ClothSimulation::getSizeY()
 	
 void ClothSimulation::transfertToGpu()
 {
-	cudaMemcpy (devNodeX, &(nodeX[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
- 	cudaMemcpy (devNodeY, &(nodeY[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
- 	cudaMemcpy (devNodeZ, &(nodeZ[0]), sizeX * sizeY * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy (devNodeX, &(nodeX[0]), nbNodes * sizeof(float), cudaMemcpyHostToDevice);
+ 	cudaMemcpy (devNodeY, &(nodeY[0]), nbNodes * sizeof(float), cudaMemcpyHostToDevice);
+ 	cudaMemcpy (devNodeZ, &(nodeZ[0]), nbNodes * sizeof(float), cudaMemcpyHostToDevice);
 }
 
 void ClothSimulation::transfertFromGpu()
 {
 	cudaError_t error;
 	
-	//error = cudaMemset (devNodeX, 0, sizeX * sizeY * sizeof(float));
-	//cudaMemset (devNodeY, 0, sizeX * sizeY * sizeof(float));
-	//cudaMemset (devNodeZ, 0, sizeX * sizeY * sizeof(float));
+	//error = cudaMemset (devNodeX, 0, nbNodes * sizeof(float));
+	//cudaMemset (devNodeY, 0, nbNodes * sizeof(float));
+	//cudaMemset (devNodeZ, 0, nbNodes * sizeof(float));
 	
 	//std::cout << " 1 " << cudaGetErrorString(error) << std::endl;
 
-	error = cudaMemcpy ( &(nodeX[0]), devNodeX, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
- 	error = cudaMemcpy ( &(nodeY[0]), devNodeY, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
- 	error = cudaMemcpy ( &(nodeZ[0]), devNodeZ, sizeX * sizeY * sizeof(float), cudaMemcpyDeviceToHost);
+	error = cudaMemcpy ( &(nodeX[0]), devNodeX, nbNodes * sizeof(float), cudaMemcpyDeviceToHost);
+ 	error = cudaMemcpy ( &(nodeY[0]), devNodeY, nbNodes * sizeof(float), cudaMemcpyDeviceToHost);
+ 	error = cudaMemcpy ( &(nodeZ[0]), devNodeZ, nbNodes * sizeof(float), cudaMemcpyDeviceToHost);
  	
  	std::cout << cudaGetErrorString(cudaGetLastError()) << std::endl;
  	

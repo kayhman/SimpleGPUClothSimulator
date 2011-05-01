@@ -30,23 +30,19 @@ private:
 
 	float k;
 	float b;
-	float refLengthX;
-	float refLengthY;
-	float refLengthZ;
-	float refLengthDiagX;
-	float refLengthDiagY;
-	float refLengthDiagZ;
+	float refLength;
 	float mass;
 
 public:
-	ClothSimulation(int sizeX, int sizeY);
+	ClothSimulation();
 	~ClothSimulation();
 
-	void init(float x0, float y0, float z0, float lx, float ly,
+	void init(float x0, float y0, float z0, 
+			float lx, float ly,
+			float elementSize,
 			float k, float b);
 	void computeInternalForces();
 	void handleCollision(int collisionType);
-	void computeContactForces();
 	void integrate();
 
 
@@ -59,6 +55,7 @@ public:
 	
 
 private:
+	void allocateGPUMem();
 	void transfertToGpu();
 public:
 	void transfertFromGpu();

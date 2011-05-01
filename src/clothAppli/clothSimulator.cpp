@@ -39,18 +39,22 @@ void InitGL(int Width, int Height)	        // We call this right after our OpenG
 
    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
    GLfloat mat_shininess[] = { 50.0 };
-   GLfloat light_position[] = { 1.0, 2.0, 1.0, 0.0 };
+   GLfloat light0_position[] = { 0, 7., 0., 0.0 }; // LR / UD / FB
+   GLfloat light1_position[] = { -5., 3., 3., 0.0 };
    glClearColor (0.0, 0.0, 0.0, 0.0);
    glShadeModel (GL_SMOOTH);
 
    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
    glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
-   glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+   glLightfv(GL_LIGHT0, GL_POSITION, light0_position);
+   glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
 
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
+   glEnable(GL_LIGHT1);
   //glPolygonMode(GL_FRONT, GL_LINE);
 
+  glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();				// Reset The Projection Matrix
 
@@ -78,13 +82,14 @@ void ReSizeGLScene(int Width, int Height)
 void DrawGLScene()
 {
 	static bool init = true;
-	static ClothSimulation clothSimulation(128*4, 128*4);
+	static ClothSimulation clothSimulation;
 
 	if(init)
 	{
-		clothSimulation.init(-2.0, -2.0, 0.1,
-					4.0, 4.0,
-					5.51, 0.);
+		clothSimulation.init(-2.0, -1.0, 0.1,
+					4.0, 2.0,
+					4.0 / 200,
+					50.51, 0.);
 		init = false;
 	}
 	
@@ -110,67 +115,94 @@ void DrawGLScene()
   std::vector<float>& Y = clothSimulation.getNodeY();
   std::vector<float>& Z = clothSimulation.getNodeZ();
  
+  std::vector<float> nX(X.size());
+  std::vector<float> nY(Y.size());
+  std::vector<float> nZ(Z.size());
+ 
+  std::fill(nX.begin(), nX.end(), 0.);
+  std::fill(nY.begin(), nY.end(), 0.);
+  std::fill(nZ.begin(), nZ.end(), 0.);
+ 
+ ///////////////////////////
+ //     smooth normals    //
+ ///////////////////////////
   for(int i = 0 ; i < gridSizeX-1 ; ++i)
 	  for(int j = 0 ; j < gridSizeY-1 ; ++j)
 		  {
-		  	  float nodeX[4];
-		  	  float nodeY[4];
-		  	  float nodeZ[4];
+		  	  int n1Idx = i * gridSizeY + j;
+		  	  int n2Idx = i * gridSizeY + j + 1;
+		  	  int n3Idx = (i+1) * gridSizeY + j;
+		  	  int n4Idx = (i+1) * gridSizeY + j + 1;
 		  	  
-		  	  nodeX[0] = X[i * gridSizeY + j];
-		  	  nodeY[0] = Y[i * gridSizeY + j];
-		  	  nodeZ[0] = Z[i * gridSizeY + j];
 
-		  	  nodeX[1] = X[i * gridSizeY + j + 1 ];
-		  	  nodeY[1] = Y[i * gridSizeY + j + 1 ];
-		  	  nodeZ[1] = Z[i * gridSizeY + j + 1 ];
-		  	  
-		  	  nodeX[2] = X[(i + 1) * gridSizeY + j];
-		  	  nodeY[2] = Y[(i + 1) * gridSizeY + j];
-		  	  nodeZ[2] = Z[(i + 1) * gridSizeY + j];
-		  	  
-			  nodeX[3] = X[(i + 1) * gridSizeY + j + 1 ];
-		  	  nodeY[3] = Y[(i + 1) * gridSizeY + j + 1 ];
-		  	  nodeZ[3] = Z[(i + 1) * gridSizeY + j + 1 ];
-
-
-			  float nx = (nodeY[1] - nodeY[0]) * (nodeZ[2] - nodeZ[0])-  (nodeY[2] - nodeY[0]) * (nodeZ[1] - nodeZ[0]);
-			  float ny = (nodeZ[1] - nodeZ[0]) * (nodeX[2] - nodeX[0]) - (nodeZ[2] - nodeZ[0]) * (nodeX[1] - nodeX[0]);
-			  float nz = (nodeX[1] - nodeX[0]) * (nodeY[2] - nodeY[0]) - (nodeX[2] - nodeX[0]) * (nodeY[1] - nodeY[0]);
+			  float nx = (Y[n2Idx] - Y[n1Idx]) * (Z[n3Idx] - Z[n1Idx])-  (Y[n3Idx] - Y[n1Idx]) * (Z[n2Idx] - Z[n1Idx]);
+			  float ny = (Z[n2Idx] - Z[n1Idx]) * (X[n3Idx] - X[n1Idx]) - (Z[n3Idx] - Z[n1Idx]) * (X[n2Idx] - X[n1Idx]);
+			  float nz = (X[n2Idx] - X[n1Idx]) * (Y[n3Idx] - Y[n1Idx]) - (X[n3Idx] - X[n1Idx]) * (Y[n2Idx] - Y[n1Idx]);
 				
+			nX[n1Idx] += nx;
+			nY[n1Idx] += ny;
+			nZ[n1Idx] += nz;
+			
+			nX[n2Idx] += nx;
+			nY[n2Idx] += ny;
+			nZ[n2Idx] += nz;
+			
+			nX[n3Idx] += nx;
+			nY[n3Idx] += ny;
+			nZ[n3Idx] += nz;
+			
+			nX[n4Idx] += nx;
+			nY[n4Idx] += ny;
+			nZ[n4Idx] += nz;
+}  
+ 
+for(int i = 0 ; i < nX.size() ; i++)
+{
+	float norm = sqrt(nX[i] * nX[i] + nY[i] * nY[i] + nZ[i] * nZ[i]);
+	if(norm)
+	{
+	nX[i] /= -norm;
+	nY[i] /= -norm;
+	nZ[i] /= -norm;
+	}
+}  
 
-		  	  float norm = sqrt(nx * nx + ny * ny + nz * nz);
-			  if(norm)
-			  {
-				  nx /= -norm;
-				  ny /= -norm;
-				  nz /= -norm;
-			  }
+///////////////////////////
+//    Display triangles  //
+///////////////////////////
+  for(int i = 0 ; i < gridSizeX-1 ; ++i)
+	  for(int j = 0 ; j < gridSizeY-1 ; ++j)
+		  {
+			  int n1Idx = i * gridSizeY + j;
+		  	  int n2Idx = i * gridSizeY + j + 1;
+		  	  int n3Idx = (i+1) * gridSizeY + j;
+		  	  int n4Idx = (i+1) * gridSizeY + j + 1;
+		  	  
 			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Red
-  			  glVertex3f(nodeX[0], nodeY[0], -nodeZ[0]);		        // Top of triangle (front)
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
+  			  glVertex3f(X[n1Idx], Y[n1Idx], -Z[n1Idx]);		        // Top of triangle (front)
+  			  glNormal3f(-nX[n1Idx], -nY[n1Idx], -nZ[n1Idx]);		        // Top of triangle (front)
   			  
 			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Green
-			  glVertex3f(nodeX[1], nodeY[1], -nodeZ[1]);		// left of triangle (front)
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
-			  
+			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);		// left of triangle (front)
+ 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);		        // Top of triangle (front)
+ 			  
 			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Blue
-			  glVertex3f(nodeX[2], nodeY[2], -nodeZ[2]);		        // right of traingle (front)	
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
-		  	
+			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);		        // right of traingle (front)	
+ 			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);		        // Top of triangle (front)
+ 		  	
 		  	
 		  	  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Red
-  			  glVertex3f(nodeX[2], nodeY[2], -nodeZ[2]);		        // Top of triangle (front)
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
+  			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);		        // Top of triangle (front)
+  			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);		        // Top of triangle (front)
   			  
 			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Green
-			  glVertex3f(nodeX[1], nodeY[1], -nodeZ[1]);		// left of triangle (front)
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
-			  
+			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);		// left of triangle (front)
+ 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);		        // Top of triangle (front)
+ 			  
 			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Blue
-			  glVertex3f(nodeX[3], nodeY[3], -nodeZ[3]);		        // right of traingle (front)	
-  			  glNormal3f(-nx, -ny, -nz);		        // Top of triangle (front)
-		  }
+			  glVertex3f(X[n4Idx], Y[n4Idx], -Z[n4Idx]);		        // right of traingle (front)	
+ 			  glNormal3f(-nX[n4Idx], -nY[n4Idx], -nZ[n4Idx]);		        // Top of triangle (front)
+ 		  }
 
   // front face of pyramid
 
