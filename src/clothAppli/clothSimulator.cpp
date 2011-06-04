@@ -88,8 +88,12 @@ void DrawGLScene()
 	{
 		clothSimulation.init(-2.0, -1.0, 0.1,
 					4.0, 2.0,
-					4.0 / 200,
+					4.0 / 250,
 					50.51, 0.);
+		//clothSimulation.init(-2.0, -2.0, 0.1,
+		//			4.0, 4.0,
+		//			4.0 / 250,
+		//			50.51, 0.);
 		init = false;
 	}
 	

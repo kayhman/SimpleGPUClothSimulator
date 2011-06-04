@@ -1,6 +1,9 @@
 #include "clothSimulation.h"
 #include <iostream>
  
+ #define BLOCKX 16
+ #define BLOCKY 16
+ 
 ///////////////////////////////////////////
 //           CUDA Kernel Code            //
 ///////////////////////////////////////////
@@ -78,20 +81,23 @@ float* Ux, float * Uy, float* Uz,
  float* fX,
  float* fY,
  float* fZ,
- const int sizeX,
+ const int sizeY,
  const float mass)
 {
 	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
 	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	const int idx = (blockIdx.y * gridDim.x + blockIdx.x )* (blockDim.x * blockDim.y) + threadIdx.y * blockDim.x + threadIdx.x ;
+	//const int idx = nodeJ * sizeY + nodeI; 
 
-	Ux[nodeI * sizeX + nodeJ] += dt * (fX[nodeI * sizeX + nodeJ] - Ux[nodeI * sizeX + nodeJ] * 0.02)  / mass;
-	Uy[nodeI * sizeX + nodeJ] += dt * (fY[nodeI * sizeX + nodeJ] - Uy[nodeI * sizeX + nodeJ] * 0.02)  / mass;
-	Uz[nodeI * sizeX + nodeJ] += dt * (fZ[nodeI * sizeX + nodeJ] - Uz[nodeI * sizeX + nodeJ] * 0.02)  / mass;
+	Ux[idx] += dt * (fX[idx] - Ux[idx] * 0.02)  / mass;
+	Uy[idx] += dt * (fY[idx] - Uy[idx] * 0.02)  / mass;
+	Uz[idx] += dt * (fZ[idx] - Uz[idx] * 0.02)  / mass;
 
 
-	X[nodeI * sizeX + nodeJ] += dt * Ux[nodeI * sizeX + nodeJ];
-	Y[nodeI * sizeX + nodeJ] += dt * Uy[nodeI * sizeX + nodeJ];
-	Z[nodeI * sizeX + nodeJ] += dt * Uz[nodeI * sizeX + nodeJ];
+	X[idx] += dt * Ux[idx];
+	Y[idx] += dt * Uy[idx];
+	Z[idx] += dt * Uz[idx];
 	
 	
 }
@@ -100,21 +106,24 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
  float* fX,
  float* fY,
  float* fZ,
- const int sizeX,
+ const int sizeY,
  const float mass)
 {
 	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
 	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
+	//const int idx = nodeJ * sizeY + nodeI;
+	const int idx = (blockIdx.y * gridDim.x + blockIdx.x )* (blockDim.x * blockDim.y) + threadIdx.y * blockDim.x + threadIdx.x ;
+	
 	const float diskZ = 0.0f;
 	const float diskRadius = 1.75f;
 	
 	const float diskCenterX = 0.f;
 	const float diskCenterY = 0.f;
 	
-	const float x = X[nodeI * sizeX + nodeJ];
-	const float y = Y[nodeI * sizeX + nodeJ];
-	const float z = Z[nodeI * sizeX + nodeJ];
+	const float x = X[idx];
+	const float y = Y[idx];
+	const float z = Z[idx];
 
 	if(z < diskZ && z > diskZ - 0.01)
 	{
@@ -122,10 +131,10 @@ __global__ void handleCollisionWithDisk(float* X, float * Y, float* Z,
 		
 		if(distToCenter < diskRadius)
 		{
-			fX[nodeI * sizeX + nodeJ] = 0.;
-			fY[nodeI * sizeX + nodeJ] = 0.;
-			fZ[nodeI * sizeX + nodeJ] = 0.;
-			Z[nodeI * sizeX + nodeJ] = diskZ;
+			fX[idx] = 0.;
+			fY[idx] = 0.;
+			fZ[idx] = 0.;
+			Z[idx] = diskZ;
 		}
 	 }
 }
@@ -134,7 +143,7 @@ __global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
  float* fX,
  float* fY,
  float* fZ,
- const int sizeX,
+ const int sizeY,
  const float mass)
 {
 	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
@@ -145,20 +154,23 @@ __global__ void handleCollisionWithRectangle(float* X, float * Y, float* Z,
 	const float minY = -0.7f;
 	const float maxX = 1.7f;
 	const float maxY = 0.7f;
+	
+	const int idx = (blockIdx.y * gridDim.x + blockIdx.x )* (blockDim.x * blockDim.y) + threadIdx.y * blockDim.x + threadIdx.x ;
+	//const int idx = nodeJ * sizeY + nodeI;
 		
-	const float x = X[nodeI * sizeX + nodeJ];
-	const float y = Y[nodeI * sizeX + nodeJ];
-	const float z = Z[nodeI * sizeX + nodeJ];
+	const float x = X[idx];
+	const float y = Y[idx];
+	const float z = Z[idx];
 
 	if(z < rectZ && z > rectZ - 0.01)
 	{
 		if( x > minX && x < maxX &&
 		    y > minY && y < maxY)
 		{
-			fX[nodeI * sizeX + nodeJ] = 0.;
-			fY[nodeI * sizeX + nodeJ] = 0.;
-			fZ[nodeI * sizeX + nodeJ] = 0.;
-			Z[nodeI * sizeX + nodeJ] = rectZ;
+			fX[idx] = 0.;
+			fY[idx] = 0.;
+			fZ[idx] = 0.;
+			Z[idx] = rectZ;
 		}
 	 }
 }
@@ -245,8 +257,8 @@ float b)
 	this->k = k;
 	this->b = b;
 	
-	sizeX = 4 * (lx / elementSize) / 4;
-	sizeY = 4 * (ly / elementSize) / 4;
+	sizeX = BLOCKX * ((int)(lx / elementSize) / BLOCKX + 1);
+	sizeY = BLOCKY * ((int)(ly / elementSize) / BLOCKY + 1);
 	
 	nbNodes = sizeX * sizeY;
 	
@@ -277,8 +289,8 @@ float b)
 
 void ClothSimulation::computeInternalForces()
 {
-	dim3 nBlocks(4, 4);
-	dim3 blockSize(sizeX/4, sizeY/4);
+	dim3 nBlocks(1, 64);
+	dim3 blockSize(sizeX/1, sizeY/64);
 
 	cudaEvent_t start, stop;
 	float time;
@@ -309,9 +321,9 @@ void ClothSimulation::computeInternalForces()
 
 void ClothSimulation::handleCollision(int collisionType)
 {
-	dim3 nBlocks(4, 4);
+	dim3 nBlocks(BLOCKX, BLOCKY);
 	
-	dim3 blockSize(sizeX/4, sizeY/4);
+	dim3 blockSize(sizeX/BLOCKX, sizeY/BLOCKY);
 	
 	cudaEvent_t start, stop;
 	float time;
@@ -325,7 +337,7 @@ void ClothSimulation::handleCollision(int collisionType)
 		 devFx,
 		 devFy,
 		 devFz,
-		 sizeX,
+		 sizeY,
 		 mass);
 	}	 	
 	if(collisionType == 1)
@@ -334,7 +346,7 @@ void ClothSimulation::handleCollision(int collisionType)
 		 devFx,
 		 devFy,
 		 devFz,
-		 sizeX,
+		 sizeY,
 		 mass);
 	}		cudaEventRecord( stop, 0 );
 	cudaEventSynchronize( stop );
@@ -348,9 +360,9 @@ void ClothSimulation::handleCollision(int collisionType)
 
 void ClothSimulation::integrate()
 {
-	dim3 nBlocks(4, 4);
+	dim3 nBlocks(BLOCKX, BLOCKY);
 	
-	dim3 blockSize(sizeX/4, sizeY/4);
+	dim3 blockSize(sizeX/BLOCKX, sizeY/BLOCKY);
 	
 	cudaEvent_t start, stop;
 	float time;
@@ -363,7 +375,7 @@ void ClothSimulation::integrate()
 	 devFx,
 	 devFy,
 	 devFz,
-	 sizeX,
+	 sizeY,
 	 mass);
 	
 	cudaEventRecord( stop, 0 );
@@ -391,6 +403,7 @@ std::vector<float>&	ClothSimulation::getNodeZ()
 {
 	return nodeZ;
 }
+
 	
 int ClothSimulation::getSizeX()
 {
