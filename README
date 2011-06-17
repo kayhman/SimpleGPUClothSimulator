@@ -1,0 +1,23 @@
+To build this example program simply create a "build" reposity next to the one holding this file.
+
+- code/README
+- code/...
+- build
+
+Go to this repository :
+
+# cd build
+
+Generate the build system using cmake :
+
+# cmake .
+
+and build :
+
+# make -j8
+
+Then, execute the program :
+
+# ./src/clothAppli/clothSimulator
+
+

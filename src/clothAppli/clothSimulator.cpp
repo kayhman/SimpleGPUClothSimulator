@@ -3,30 +3,18 @@
 #include <math.h>
 
 
-//
-// This code was created by Jeff Molofee '99 (ported to Linux/GLUT by Richard Campbell '99)
-//
-// If you've found this code useful, please let me know.
-//
-// Visit me at www.demonews.com/hosted/nehe 
-// (email Richard Campbell at ulmont@bellsouth.net)
-//
 #include <GL/glut.h>    // Header File For The GLUT Library 
 #include <GL/gl.h>	// Header File For The OpenGL32 Library
 #include <GL/glu.h>	// Header File For The GLu32 Library
 #include <unistd.h>     // needed to sleep
 
-/* ASCII code for the escape key. */
 #define ESCAPE 27
 
 /* The number of our GLUT window */
 int window; 
 
-/* rotation angle for the triangle. */
+/* camera rotation angle  */
 float rtri = 0.0f;
-
-/* rotation angle for the quadrilateral. */
-float rquad = 0.0f;
 
 /* A general OpenGL initialization function.  Sets all of the initial parameters. */
 void InitGL(int Width, int Height)	        // We call this right after our OpenGL window is created.
@@ -52,7 +40,6 @@ void InitGL(int Width, int Height)	        // We call this right after our OpenG
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
    glEnable(GL_LIGHT1);
-  //glPolygonMode(GL_FRONT, GL_LINE);
 
   glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
   glMatrixMode(GL_PROJECTION);
@@ -158,8 +145,9 @@ void DrawGLScene()
 			nX[n4Idx] += nx;
 			nY[n4Idx] += ny;
 			nZ[n4Idx] += nz;
-}  
- 
+} 
+
+//normalize normals.
 for(int i = 0 ; i < nX.size() ; i++)
 {
 	float norm = sqrt(nX[i] * nX[i] + nY[i] * nY[i] + nZ[i] * nZ[i]);
@@ -182,38 +170,37 @@ for(int i = 0 ; i < nX.size() ; i++)
 		  	  int n3Idx = (i+1) * gridSizeY + j;
 		  	  int n4Idx = (i+1) * gridSizeY + j + 1;
 		  	  
-			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Red
-  			  glVertex3f(X[n1Idx], Y[n1Idx], -Z[n1Idx]);		        // Top of triangle (front)
-  			  glNormal3f(-nX[n1Idx], -nY[n1Idx], -nZ[n1Idx]);		        // Top of triangle (front)
+			  //Display first triangle
+			  glColor3f(0.0f,0.3f,0.7f);
+  			  glVertex3f(X[n1Idx], Y[n1Idx], -Z[n1Idx]);
+  			  glNormal3f(-nX[n1Idx], -nY[n1Idx], -nZ[n1Idx]);
   			  
-			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Green
-			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);		// left of triangle (front)
- 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);		        // Top of triangle (front)
+			  glColor3f(0.0f,0.3f,0.7f);
+			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);
+ 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);
  			  
-			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Blue
-			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);		        // right of traingle (front)	
- 			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);		        // Top of triangle (front)
+			  glColor3f(0.0f,0.3f,0.7f);
+			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);
+ 			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);
  		  	
-		  	
-		  	  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Red
-  			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);		        // Top of triangle (front)
-  			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);		        // Top of triangle (front)
+		  	  //Display second triangle
+		  	  glColor3f(0.0f,0.3f,0.7f);
+  			  glVertex3f(X[n3Idx], Y[n3Idx], -Z[n3Idx]);
+  			  glNormal3f(-nX[n3Idx], -nY[n3Idx], -nZ[n3Idx]);
   			  
-			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Green
-			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);		// left of triangle (front)
- 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);		        // Top of triangle (front)
+			  glColor3f(0.0f,0.3f,0.7f);
+			  glVertex3f(X[n2Idx], Y[n2Idx], -Z[n2Idx]);
+ 			  glNormal3f(-nX[n2Idx], -nY[n2Idx], -nZ[n2Idx]);
  			  
-			  glColor3f(0.0f,0.3f,0.7f);			// Set The Color To Blue
-			  glVertex3f(X[n4Idx], Y[n4Idx], -Z[n4Idx]);		        // right of traingle (front)	
- 			  glNormal3f(-nX[n4Idx], -nY[n4Idx], -nZ[n4Idx]);		        // Top of triangle (front)
+			  glColor3f(0.0f,0.3f,0.7f);
+			  glVertex3f(X[n4Idx], Y[n4Idx], -Z[n4Idx]);
+ 			  glNormal3f(-nX[n4Idx], -nY[n4Idx], -nZ[n4Idx]);
  		  }
 
-  // front face of pyramid
 
-  glEnd();					// Done Drawing The Pyramid
+  glEnd();
 
-  rtri+= 0.15f;					// Increase The Rotation Variable For The Pyramid
-  rquad-= 0.015f*0.;					// Decrease The Rotation Variable For The Cube
+  rtri+= 0.15f;
 
   // swap the buffers to display, since double buffering is used.
   glutSwapBuffers();
@@ -277,8 +264,6 @@ int main(int argc, char **argv)
 
   /* Initialize our window. */
   InitGL(640, 480);
-  
-  
   
   
   /* Start Event Processing Engine */  
