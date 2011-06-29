@@ -8,9 +8,6 @@
 //           CUDA Kernel Code            //
 ///////////////////////////////////////////
 
-const float gravity = 9.81f;
-const float dt = 1e-3;
-
 
  __global__ void internalForcesKernel(float* X, float * Y, float* Z,
  float* fX,
@@ -23,6 +20,7 @@ const float dt = 1e-3;
  const float h,
  const float mass)
 {
+	const float gravity = 9.81f;
 	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
 	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -84,6 +82,7 @@ float* Ux, float * Uy, float* Uz,
  const int sizeY,
  const float mass)
 {
+	const float dt = 1e-3;
 	const int nodeI = blockIdx.y * blockDim.y + threadIdx.y;
 	const int nodeJ = blockIdx.x * blockDim.x + threadIdx.x;
 	
